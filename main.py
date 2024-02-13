@@ -64,12 +64,13 @@ def list_urls():
     keys = list(url_mapping.keys())
     return jsonify({"values": keys}), 200
 
+
 @app.route('/<id>', methods=['GET'])
 def redirect_to_url(id):
     # 根据提供的短ID重定向到URL
     url = url_mapping.get(id)
     if url:
-        return redirect(url, code=301)
+        return jsonify({"value": url}), 301
     else:
         abort(404)
 
