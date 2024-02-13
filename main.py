@@ -76,12 +76,24 @@ def redirect_to_url(id):
 
 @app.route('/<id>', methods=['PUT'])
 def update_url(id):
+
+    if id not in url_mapping:
+        return jsonify({'error': 'id does not exist'}), 404
+
     # 更新一个已存在的URL映射
-    data = request.get_json()
-    if 'url' not in data:
-        return jsonify({'error': 'Error'}), 400
+    data = request.get_data()
+
+    data_str = data.decode('utf-8')
+    data_dict = json.loads(data_str)
+
+    if data is None:
+        return jsonify({'error': 'No JSON data received'}), 400
+    if 'url' not in data_dict:
+        return jsonify({'error': 'No URL provided in JSON data'}), 400
+    if not is_valid_url(data_dict['url']):
+        return jsonify({'error': 'URL is not valid'}), 400
     if id in url_mapping:
-        url_mapping[id] = data['url']
+        url_mapping[id] = data_dict['url']
         return jsonify({}), 200
     else:
         abort(404)
