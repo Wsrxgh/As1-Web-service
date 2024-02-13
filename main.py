@@ -6,12 +6,11 @@ import re
 
 app = Flask(__name__)
 
-url_mapping = {}# 这个字典将存储短URL到原始URL的映射
+url_mapping = {}
 id_to_url = {}
-next_id = 1  # 初始化自增ID
+next_id = 1  
 
 def is_valid_url(url):
-    # 此正则表达式检查大部分常见的URL格式
     regex = re.compile(
         
         r'^(https?|ftp):\/\/'  
@@ -45,9 +44,9 @@ def create_url():
             id = id_to_url[url]
     else:
             # 否则，创建一个新的映射
-            id = base62_encode(next_id)
+            id = base62_encode(next_id+10)
             url_mapping[id] = url
-            id_to_url[url] = id  # 保存URL到ID的映射
+            id_to_url[url] = id 
             next_id += 1
     
     return jsonify({'id': id}), 201
@@ -64,21 +63,20 @@ def list_urls():
     keys = list(url_mapping.keys())
     return jsonify({"values": keys}), 200
 
-
 @app.route('/<id>', methods=['GET'])
 def redirect_to_url(id):
     # 根据提供的短ID重定向到URL
     url = url_mapping.get(id)
     if url:
-        return jsonify({"value": url}), 301
+        return jsonify(value=url), 301
+    
     else:
         abort(404)
 
 @app.route('/<id>', methods=['PUT'])
 def update_url(id):
-
     if id not in url_mapping:
-        return jsonify({'error': 'id does not exist'}), 404
+            return jsonify({'error': 'id does not exist'}), 404
 
     # 更新一个已存在的URL映射
     data = request.get_data()
@@ -98,9 +96,10 @@ def update_url(id):
     else:
         abort(404)
 
+
+
 @app.route('/<id>', methods=['DELETE'])
 def delete_url(id):
-    # 删除一个URL映射
     if id in url_mapping:
         del url_mapping[id]
         return jsonify({}), 204
