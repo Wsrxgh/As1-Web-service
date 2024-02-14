@@ -1,7 +1,5 @@
-from flask import Flask, request, jsonify, redirect, abort
-import hashlib
+from flask import Flask, request, jsonify,  abort
 import json
-import threading
 import re
 
 app = Flask(__name__)
@@ -56,14 +54,20 @@ def create_url():
 
 
 @app.route('/', methods=['DELETE'])
-def delete_not_supported():
+def delete_all_urls():
+    global url_mapping, id_to_url, next_id
+    url_mapping.clear()  
+    id_to_url.clear()    
+    next_id = 1          
     abort(404)
 
 @app.route('/', methods=['GET'])
 def list_urls():
-    # 列出所有映射的键
-    keys = list(url_mapping.keys())
-    return jsonify({"value": keys}), 200
+    if not url_mapping:  
+        return jsonify({"value": None}), 200  
+    else:
+        keys = list(url_mapping.keys())
+        return jsonify({"value": keys}), 200  
 
 @app.route('/<id>', methods=['GET'])
 def redirect_to_url(id):
