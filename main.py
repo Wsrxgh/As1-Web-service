@@ -10,7 +10,7 @@ url_mapping = {}
 id_to_url = {}
 next_id = 1  
 
-def is_valid_url(url):
+def is_valid_url(url): #Check URL validity with a regular expression
     regex = re.compile(
         
         r'^(https?|ftp):\/\/'  
@@ -35,6 +35,8 @@ def base62_encode(num): #基62编码
 def create_url():
     global next_id
     data = request.get_json()
+
+    #Check URL validity before creating a mapping for it
     if 'value' not in data or not is_valid_url(data['value']):
         return jsonify({'error': 'Invalid URL'}), 400
     
@@ -61,7 +63,7 @@ def delete_not_supported():
 def list_urls():
     # 列出所有映射的键
     keys = list(url_mapping.keys())
-    return jsonify({"values": keys}), 200
+    return jsonify({"value": keys}), 200
 
 @app.route('/<id>', methods=['GET'])
 def redirect_to_url(id):
