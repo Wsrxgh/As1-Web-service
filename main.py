@@ -20,7 +20,7 @@ def is_valid_url(url): #Check URL validity with a regular expression
         r'(?:/?|[/?]\S+)$', re.IGNORECASE)  
     return re.match(regex, url) is not None
   
-def base62_encode(num): #基62编码
+def base62_encode(num): # Function to encode a numeric ID into a base62 string.
     characters = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
     base = len(characters)
     encoded = ''
@@ -29,21 +29,18 @@ def base62_encode(num): #基62编码
         encoded = characters[rem] + encoded
     return encoded
 
-@app.route('/', methods=['POST']) #创建映射
+@app.route('/', methods=['POST']) # Route to create a new URL entry.
 def create_url():
     global next_id
     data = request.get_json()
-
-    #Check URL validity before creating a mapping for it
     if 'value' not in data or not is_valid_url(data['value']):
         return jsonify({'error': 'Invalid URL'}), 400
-    
     url = data['value']
     if url in id_to_url and id_to_url[url] in url_mapping:
-            # 如果URL已存在，直接返回对应的ID
+            # If the URL already exists, return the corresponding ID.
             id = id_to_url[url]
     else:
-            # 否则，创建一个新的映射
+            # Otherwise, create a new mapping.
             id = base62_encode(next_id+10)
             url_mapping[id] = url
             id_to_url[url] = id 
@@ -51,9 +48,7 @@ def create_url():
     
     return jsonify({'id': id}), 201
 
-
-
-@app.route('/', methods=['DELETE'])
+@app.route('/', methods=['DELETE'])# Route to delete all URL mappings.
 def delete_all_urls():
     global url_mapping, id_to_url, next_id
     url_mapping.clear()  
@@ -61,7 +56,7 @@ def delete_all_urls():
     next_id = 1          
     abort(404)
 
-@app.route('/', methods=['GET'])
+@app.route('/', methods=['GET'])# Route to list all stored URLs.
 def list_urls():
     if not url_mapping:  
         return jsonify({"value": None}), 200  
@@ -69,9 +64,8 @@ def list_urls():
         keys = list(url_mapping.keys())
         return jsonify({"value": keys}), 200  
 
-@app.route('/<id>', methods=['GET'])
+@app.route('/<id>', methods=['GET'])# Route to redirect to the original URL based on its ID.
 def redirect_to_url(id):
-    # 根据提供的短ID重定向到URL
     url = url_mapping.get(id)
     if url:
         return jsonify(value=url), 301
@@ -79,7 +73,7 @@ def redirect_to_url(id):
     else:
         abort(404)
 
-@app.route('/<id>', methods=['PUT'])
+@app.route('/<id>', methods=['PUT'])# Route to update an existing URL mapping with a new URL.
 def update_url(id):
     if id not in url_mapping:
             return jsonify({'error': 'id does not exist'}), 404
@@ -102,9 +96,7 @@ def update_url(id):
     else:
         abort(404)
 
-
-
-@app.route('/<id>', methods=['DELETE'])
+@app.route('/<id>', methods=['DELETE'])# Route to delete a specific URL mapping based on its ID.
 def delete_url(id):
     if id in url_mapping:
         del url_mapping[id]
