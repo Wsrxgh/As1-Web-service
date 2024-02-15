@@ -77,10 +77,8 @@ def redirect_to_url(id):
 def update_url(id):
     if id not in url_mapping:
             return jsonify({'error': 'id does not exist'}), 404
-
-    # 更新一个已存在的URL映射
+    
     data = request.get_data()
-
     data_str = data.decode('utf-8')
     data_dict = json.loads(data_str)
 
