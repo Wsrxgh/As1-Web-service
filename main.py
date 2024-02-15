@@ -6,7 +6,6 @@ app = Flask(__name__)
 
 url_mapping = {}
 url_to_id = {}
-next_id = 1  
 
 def is_valid_url(url): #Check URL validity with a regular expression
     regex = re.compile(
@@ -48,10 +47,9 @@ def create_url():
 
 @app.route('/', methods=['DELETE'])# Route to delete all URL mappings.
 def delete_all_urls():
-    global url_mapping, url_to_id, next_id
+    global url_mapping, url_to_id
     url_mapping.clear()  
-    url_to_id.clear()    
-    next_id = 1          
+    url_to_id.clear()             
     abort(404)
 
 @app.route('/', methods=['GET'])# Route to list all stored URLs.
