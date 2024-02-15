@@ -21,9 +21,7 @@ def is_valid_url(url): #Check URL validity with a regular expression
     return re.match(regex, url) is not None
   
 def generate_hash_id(url):
-    # Use SHA-256 hash of the URL to generate a hash ID
     hash_object = hashlib.sha256(url.encode())
-    # Take the first 8 characters for simplicity
     hash_id = hash_object.hexdigest()[:8]
     return hash_id
 
@@ -34,19 +32,14 @@ def create_url():
         return jsonify({'error': 'Invalid URL'}), 400
     url = data['value']
     
-    # Check if the URL already exists
-    if url in url_to_id:
-        # Return the existing ID if the URL is already stored
+    if url in url_to_id:# Check if the URL already exists
         hash_id = url_to_id[url]
     else:
-        # Generate a unique hash ID for new URLs
         hash_id = generate_hash_id(url)
-        # Ensure the hash ID is unique
-        while hash_id in url_mapping:
-            # Adjust the URL slightly to attempt a new hash ID
+        while hash_id in url_mapping:# Ensure the hash ID is unique
             url += ' ' 
-            hash_id = generate_hash_id(url)
-            if url_mapping.get(hash_id) == url:  # Check if the adjusted URL resolves the conflict
+            hash_id = generate_hash_id(url) # Adjust the URL slightly to attempt a new hash ID
+            if url_mapping.get(hash_id) == url: 
                 break
         url_mapping[hash_id] = url
         url_to_id[url] = hash_id
