@@ -1,11 +1,11 @@
 from flask import Flask, request, jsonify,  abort
 import json
 import re
-
+import hashlib
 app = Flask(__name__)
 
 url_mapping = {}
-id_to_url = {}
+url_to_id = {}
 next_id = 1  
 
 def is_valid_url(url): #Check URL validity with a regular expression
@@ -20,39 +20,44 @@ def is_valid_url(url): #Check URL validity with a regular expression
         r'(?:/?|[/?]\S+)$', re.IGNORECASE)  
     return re.match(regex, url) is not None
   
-def base62_encode(num): # Function to encode a numeric ID into a base62 string.
-    characters = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    base = len(characters)
-    encoded = ''
-    while num > 0:
-        num, rem = divmod(num, base)
-        encoded = characters[rem] + encoded
-    return encoded
+def generate_hash_id(url):
+    # Use SHA-256 hash of the URL to generate a hash ID
+    hash_object = hashlib.sha256(url.encode())
+    # Take the first 8 characters for simplicity
+    hash_id = hash_object.hexdigest()[:8]
+    return hash_id
 
 @app.route('/', methods=['POST']) # Route to create a new URL entry.
 def create_url():
-    global next_id
     data = request.get_json()
     if 'value' not in data or not is_valid_url(data['value']):
         return jsonify({'error': 'Invalid URL'}), 400
     url = data['value']
-    if url in id_to_url and id_to_url[url] in url_mapping:
-            # If the URL already exists, return the corresponding ID.
-            id = id_to_url[url]
-    else:
-            # Otherwise, create a new mapping.
-            id = base62_encode(next_id+10)
-            url_mapping[id] = url
-            id_to_url[url] = id 
-            next_id += 1
     
-    return jsonify({'id': id}), 201
+    # Check if the URL already exists
+    if url in url_to_id:
+        # Return the existing ID if the URL is already stored
+        hash_id = url_to_id[url]
+    else:
+        # Generate a unique hash ID for new URLs
+        hash_id = generate_hash_id(url)
+        # Ensure the hash ID is unique
+        while hash_id in url_mapping:
+            # Adjust the URL slightly to attempt a new hash ID
+            url += ' ' 
+            hash_id = generate_hash_id(url)
+            if url_mapping.get(hash_id) == url:  # Check if the adjusted URL resolves the conflict
+                break
+        url_mapping[hash_id] = url
+        url_to_id[url] = hash_id
+
+    return jsonify({'id': hash_id}), 201
 
 @app.route('/', methods=['DELETE'])# Route to delete all URL mappings.
 def delete_all_urls():
-    global url_mapping, id_to_url, next_id
+    global url_mapping, url_to_id, next_id
     url_mapping.clear()  
-    id_to_url.clear()    
+    url_to_id.clear()    
     next_id = 1          
     abort(404)
 
@@ -69,7 +74,6 @@ def redirect_to_url(id):
     url = url_mapping.get(id)
     if url:
         return jsonify(value=url), 301
-    
     else:
         abort(404)
 
