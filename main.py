@@ -42,8 +42,9 @@ def create_user():
     password = data['password']
 
     if not username or not password:
-        return jsonify({'error': 'No username or password in JSON data'}), 400
-    if 'username' in users:
+        return jsonify({'error': 'No username or password provided in JSON data'}), 400
+
+    if username in users:
         return jsonify({'detail': 'duplicate'}), 409
 
     password_hash = generate_password_hash(password)
@@ -61,8 +62,7 @@ def login():
     password = data['password']
 
     if not username or not password:
-        return jsonify({'error': 'Missing username or password in JSON data'}), 400
-
+        return jsonify({'error': 'No username or password provided in JSON data'}), 400
     if username in users and check_password_hash(users[username]['password'], password):
         token = generate_token(username)
         return jsonify({'token': token}), 200
