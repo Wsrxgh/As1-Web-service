@@ -1,11 +1,22 @@
 from flask import Flask, request, jsonify,  abort
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask_jwt_extended import JWTManager, create_access_token
+from datetime import datetime, timedelta
 import json
 import re
 import hashlib
-app = Flask(__name__)
 
+app = Flask(__name__)
+app.config['JWT_SECRET_KEY'] = 'your_secret_key'
+jwt = JWTManager(app)
+
+users = {}
 url_mapping = {}
 url_to_id = {}
+
+def generate_token(username):
+    expires = datetime.utcnow() + timedelta(days=1)
+    return create_access_token(identity=username, expires_delta=expires)
 
 def is_valid_url(url): #Check URL validity with a regular expression
     regex = re.compile(
@@ -23,6 +34,40 @@ def generate_hash_id(url):
     hash_object = hashlib.sha256(url.encode())
     hash_id = hash_object.hexdigest()[:8]
     return hash_id
+
+@app.route('/users', methods=['POST'])
+def create_user():
+    data = request.get_json()
+    username = data['username']
+    password = data['password']
+
+    if not username or not password:
+        return jsonify({'error': 'No username or password in JSON data'}), 400
+    if 'username' in users:
+        return jsonify({'detail': 'duplicate'}), 409
+
+    password_hash = generate_password_hash(password)
+
+    users[username] = {
+        'password': password_hash
+    }
+
+    return jsonify({}), 201
+
+@app.route('/users/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    username = data['username']
+    password = data['password']
+
+    if not username or not password:
+        return jsonify({'error': 'Missing username or password in JSON data'}), 400
+
+    if username in users and check_password_hash(users[username]['password'], password):
+        token = generate_token(username)
+        return jsonify({'token': token}), 200
+    else:
+        return jsonify({'detail': 'forbidden'}), 403
 
 @app.route('/', methods=['POST']) # Route to create a new URL entry.
 def create_url():
