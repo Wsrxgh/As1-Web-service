@@ -15,15 +15,7 @@ app.config['JWT_SECRET_KEY'] = 'your_secret_key_here'  # 用你的密钥替换 '
 
 
 
-users = {
-    'username': {
-        'password': 'hashed_password',
-        'urls': {
-            'hash_id1': 'original_url1',
-            'hash_id2': 'original_url2'
-        }
-    }
-}
+users = {}
 url_mapping = {}
 url_to_id = {}
 
@@ -121,9 +113,7 @@ def jwt_required(f):
     return decorated_function
 
 
-def generate_token(username):
-    expires = datetime.utcnow() + timedelta(days=1)
-    return create_access_token(identity=username, expires_delta=expires)
+
 
 def is_valid_url(url): #Check URL validity with a regular expression
     regex = re.compile(
@@ -143,53 +133,57 @@ def generate_hash_id(url):
     return hash_id
 
 @app.route('/users', methods=['POST'])
-def register():
+def create_user():
     data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
+    username = data['username']
+    password = data['password']
 
     if not username or not password:
-        return jsonify({'error': 'Username and password are required.'}), 400
+        return jsonify({'error': 'No username or password provided in JSON data'}), 400
 
     if username in users:
-        return jsonify({'error': 'Username already exists.'}), 409
+        return jsonify({'detail': 'duplicate'}), 409
+
+    password_h = generate_password_hash(password)
 
     users[username] = {
-        'password': generate_password_hash(password),
-        'urls': {}
+        'password': password_h
     }
-    return jsonify({'message': 'User created successfully.'}), 201
 
+    return jsonify({'message': 'New user created'}), 201
 
 @app.route('/users/login', methods=['POST'])
 def login():
     data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
+    username = data['username']
+    password = data['password']
 
-    user = users.get(username)
+    if not username or not password:
+        return jsonify({'error': 'No username or password provided in JSON data'}), 400
 
-    if user and check_password_hash(user['password'], password):
+    if username in users and check_password_hash(users[username]['password'], password):
         token = generate_jwt(username)
         return jsonify({'token': token}), 200
-
-    return jsonify({'error': 'Invalid credentials.'}), 403
-
+    else:
+        return jsonify({'detail': 'forbidden'}), 403
 
 @app.route('/users', methods=['PUT'])
 def change_password():
     data = request.get_json()
-    username = data.get('username')
-    old_password = data.get('old-password')
-    new_password = data.get('new-password')
+    username = data['username']
+    password = data['password']
+    new_password = data['new_password']
 
-    user = users.get(username)
+    if not username or not password or not new_password:
+        return jsonify({'error': 'Missing fields in JSON data'}), 400
 
-    if user and check_password_hash(user['password'], old_password):
-        users[username]['password'] = generate_password_hash(new_password)
-        return jsonify({'message': 'Password updated successfully.'}), 200
-
-    return jsonify({'error': 'Invalid credentials.'}), 403
+    if username in users and check_password_hash(users[username]['password'], password):
+        users[username] = {
+            'password': new_password
+        }
+        return jsonify({'message': 'New password set'}), 200
+    else:
+        return jsonify({'detail': 'forbidden'}), 403
 
 
 @app.route('/', methods=['POST']) # Route to create a new URL entry.
