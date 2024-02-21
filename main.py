@@ -48,7 +48,7 @@ def create_user():
         'password': password_h
     }
 
-    return jsonify({}), 201
+    return jsonify({'message': 'New user created'}), 201
 
 @app.route('/users/login', methods=['POST'])
 def login():
@@ -62,6 +62,24 @@ def login():
     if username in users and check_password_hash(users[username]['password'], password):
         token = create_access_token(identity=username)
         return jsonify({'JWT': token}), 200
+    else:
+        return jsonify({'detail': 'forbidden'}), 403
+
+@app.route('/users', methods=['PUT'])
+def change_password():
+    data = request.get_json()
+    username = data['username']
+    password = data['password']
+    new_password = data['new_password']
+
+    if not username or not password or not new_password:
+        return jsonify({'error': 'Missing fields in JSON data'}), 400
+
+    if username in users and check_password_hash(users[username]['password'], password):
+        users[username] = {
+            'password': new_password
+        }
+        return jsonify({'message': 'New password set'}), 200
     else:
         return jsonify({'detail': 'forbidden'}), 403
 
