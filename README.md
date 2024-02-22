@@ -17,8 +17,14 @@ You can install Flask using pip:
 pip install Flask
 ```
 ### Start
-
+To start the authentication service, run:
 ```bash
-python main.py
+python3 auth.py
 ```
-The application will start running on http://127.0.0.1:5000
+The authentication service will start running on http://127.0.0.1:8001
+
+Then open a new terminal and run the below command to start the URL shortener service:
+```bash
+python3 main.py
+```
+The URL shortener service will start running on http://127.0.0.1:8000
