@@ -72,8 +72,13 @@ def list_urls():
     if current_user not in token_to_url:
         return jsonify({"value": None}), 200
     else:
-        #keys = list(url_mapping.keys())
-        return jsonify({"value": token_to_url[current_user]}), 200
+        urls = []
+        for hash_id, user_token in url_to_token.items():
+            if user_token == current_user:
+                url = url_mapping.get(hash_id)
+                if url:
+                    urls.append(url)
+        return jsonify({"value": urls}),  200
 
 @app.route('/<id>', methods=['GET'])# Route to redirect to the original URL based on its ID.
 def redirect_to_url(id):
