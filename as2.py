@@ -9,7 +9,8 @@ app = Flask(__name__)
 
 url_mapping = {}
 url_to_id = {}
-
+url_to_token = {}
+token_to_url = {}
 
 def is_valid_url(url): #Check URL validity with a regular expression
     regex = re.compile(
@@ -47,6 +48,8 @@ def create_url():
             if url_mapping.get(hash_id) == url: 
                 break
         url_mapping[hash_id] = url
+        url_to_token[hash_id] = current_user
+        token_to_url[current_user] = hash_id
         url_to_id[url] = hash_id
 
     return jsonify({'id': hash_id}), 201
@@ -56,7 +59,7 @@ def create_url():
 def delete_all_urls():
     current_user = g.user
     global url_mapping, url_to_id
-    url_mapping.clear()  
+    url_mapping.clear()
     url_to_id.clear()             
     abort(404)
 
@@ -65,10 +68,12 @@ def delete_all_urls():
 def list_urls():
     current_user = g.user
     if not url_mapping:  
-        return jsonify({"value": None}), 200  
+        return jsonify({"value": None}), 200
+    if current_user not in token_to_url:
+        return jsonify({"value": None}), 200
     else:
-        keys = list(url_mapping.keys())
-        return jsonify({"value": keys}), 200  
+        #keys = list(url_mapping.keys())
+        return jsonify({"value": token_to_url[current_user]}), 200
 
 @app.route('/<id>', methods=['GET'])# Route to redirect to the original URL based on its ID.
 def redirect_to_url(id):
@@ -84,6 +89,9 @@ def update_url(id):
     current_user = g.user
     if id not in url_mapping:
             return jsonify({'error': 'id does not exist'}), 404
+
+    if url_to_token[id] != current_user:
+        return jsonify({'detail': 'forbidden'}), 403
     
     data = request.get_data()
     data_str = data.decode('utf-8')
@@ -105,6 +113,9 @@ def update_url(id):
 @jwt_required
 def delete_url(id):
     current_user = g.user
+    if url_to_token[id] != current_user:
+        return jsonify({'detail': 'forbidden'}), 403
+
     if id in url_mapping:
         del url_mapping[id]
         return jsonify({}), 204
