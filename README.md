@@ -14,7 +14,7 @@ To run this application, you will need:
 You can install Flask using pip:
 
 ```bash
-pip install Flask
+pip install Flask Werkzeug
 ```
 ### Start
 To start the authentication service, run:
