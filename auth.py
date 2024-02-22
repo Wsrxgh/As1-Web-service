@@ -81,7 +81,7 @@ def jwt_required(f):
 			return jsonify({'error': 'Authorization header is missing'}), 401
 
 		parts = auth_header.split()
-		if parts[0].lower() == 'bearer' and len(parts) == 2:
+		if parts[0].lower() == 'bearer' and len(parts) == 2:# if include 'bearer'
 			token = parts[1]
 		elif len(parts) == 1:
 			token = parts[0]  
