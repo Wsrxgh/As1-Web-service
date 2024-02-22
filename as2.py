@@ -58,9 +58,23 @@ def create_url():
 @jwt_required
 def delete_all_urls():
     current_user = g.user
-    global url_mapping, url_to_id
-    url_mapping.clear()
-    url_to_id.clear()             
+    if not url_mapping:
+        return jsonify({"value": None}), 404
+    if current_user not in token_to_url:
+        return jsonify({"value": None}), 404
+    else:
+        hash_ids_to_delete = []
+        for hash_id, user_token in url_to_token.items():
+            if user_token == current_user:
+                hash_ids_to_delete.append(hash_id)
+
+        for hash_id in hash_ids_to_delete:
+            if hash_id in url_mapping:
+                del url_mapping[hash_id]
+            if hash_id in url_to_id.values():
+                urls_to_delete = [url for url, h_id in url_to_id.items() if h_id == hash_id]
+                for url in urls_to_delete:
+                    del url_to_id[url]
     abort(404)
 
 @app.route('/', methods=['GET'])# Route to list all stored URLs.
