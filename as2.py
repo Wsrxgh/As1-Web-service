@@ -116,6 +116,9 @@ def update_url(id):
 @jwt_required
 def delete_url(id):
     current_user = g.user
+    if id not in url_mapping:
+        return jsonify({'error': 'id does not exist'}), 404
+
     if url_to_token[id] != current_user:
         return jsonify({'detail': 'forbidden'}), 403
 
