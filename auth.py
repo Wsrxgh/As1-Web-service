@@ -143,12 +143,15 @@ def change_password():
         return jsonify({'error': 'Missing fields in JSON data'}), 400
 
     if username in users and check_password_hash(users[username]['password'], password):
+        # 对新密码进行哈希处理
+        new_password_hash = generate_password_hash(new_password)
         users[username] = {
-            'password': new_password
+            'password': new_password_hash
         }
         return jsonify({'message': 'New password set'}), 200
     else:
         return jsonify({'detail': 'forbidden'}), 403
+
 
 if __name__ == "__main__":
 	app.run(debug=True, port=8001)
