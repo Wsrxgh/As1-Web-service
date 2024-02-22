@@ -9,7 +9,7 @@ import hashlib
 from flask import g
 
 app = Flask(__name__)
-app.config['JWT_SECRET_KEY'] = 'your_secret_key_here' 
+app.config['JWT_SECRET_KEY'] = 'group_20_secret_key'
 
 users = {}
 
