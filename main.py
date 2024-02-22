@@ -1,17 +1,16 @@
 from flask import Flask, request, jsonify,  abort
-from werkzeug.security import generate_password_hash, check_password_hash
-from flask_jwt_extended import JWTManager, create_access_token
+from auth import jwt_required
 import json
 import re
 import hashlib
+from flask import g
 
 app = Flask(__name__)
-app.config['JWT_SECRET_KEY'] = 'your_secret_key' #修改
-jwt = JWTManager(app)
 
-users = {}
 url_mapping = {}
 url_to_id = {}
+url_to_token = {}
+token_to_url = {}
 
 def is_valid_url(url): #Check URL validity with a regular expression
     regex = re.compile(
@@ -30,61 +29,10 @@ def generate_hash_id(url):
     hash_id = hash_object.hexdigest()[:8]
     return hash_id
 
-@app.route('/users', methods=['POST'])
-def create_user():
-    data = request.get_json()
-    username = data['username']
-    password = data['password']
-
-    if not username or not password:
-        return jsonify({'error': 'No username or password provided in JSON data'}), 400
-
-    if username in users:
-        return jsonify({'detail': 'duplicate'}), 409
-
-    password_h = generate_password_hash(password)
-
-    users[username] = {
-        'password': password_h
-    }
-
-    return jsonify({'message': 'New user created'}), 201
-
-@app.route('/users/login', methods=['POST'])
-def login():
-    data = request.get_json()
-    username = data['username']
-    password = data['password']
-
-    if not username or not password:
-        return jsonify({'error': 'No username or password provided in JSON data'}), 400
-
-    if username in users and check_password_hash(users[username]['password'], password):
-        token = create_access_token(identity=username)
-        return jsonify({'JWT': token}), 200
-    else:
-        return jsonify({'detail': 'forbidden'}), 403
-
-@app.route('/users', methods=['PUT'])
-def change_password():
-    data = request.get_json()
-    username = data['username']
-    password = data['password']
-    new_password = data['new_password']
-
-    if not username or not password or not new_password:
-        return jsonify({'error': 'Missing fields in JSON data'}), 400
-
-    if username in users and check_password_hash(users[username]['password'], password):
-        users[username] = {
-            'password': new_password
-        }
-        return jsonify({'message': 'New password set'}), 200
-    else:
-        return jsonify({'detail': 'forbidden'}), 403
-
 @app.route('/', methods=['POST']) # Route to create a new URL entry.
+@jwt_required
 def create_url():
+    current_user = g.user
     data = request.get_json()
     if 'value' not in data or not is_valid_url(data['value']):
         return jsonify({'error': 'Invalid URL'}), 400
@@ -100,24 +48,49 @@ def create_url():
             if url_mapping.get(hash_id) == url: 
                 break
         url_mapping[hash_id] = url
+        url_to_token[hash_id] = current_user
+        token_to_url[current_user] = hash_id
         url_to_id[url] = hash_id
 
     return jsonify({'id': hash_id}), 201
 
 @app.route('/', methods=['DELETE'])# Route to delete all URL mappings.
+@jwt_required
 def delete_all_urls():
-    global url_mapping, url_to_id
-    url_mapping.clear()  
-    url_to_id.clear()             
+    current_user = g.user
+    if not url_mapping:
+        return jsonify({"value": None}), 404
+    if current_user not in token_to_url:
+        return jsonify({"value": None}), 404
+    else:
+        hash_ids_to_delete = []
+        for hash_id, user_token in url_to_token.items():
+            if user_token == current_user:
+                hash_ids_to_delete.append(hash_id)
+
+        for hash_id in hash_ids_to_delete:
+            if hash_id in url_mapping:
+                del url_mapping[hash_id]
+            if hash_id in url_to_id.values():
+                urls_to_delete = [url for url, h_id in url_to_id.items() if h_id == hash_id]
+                for url in urls_to_delete:
+                    del url_to_id[url]
     abort(404)
 
 @app.route('/', methods=['GET'])# Route to list all stored URLs.
+@jwt_required
 def list_urls():
+    current_user = g.user
     if not url_mapping:  
-        return jsonify({"value": None}), 200  
+        return jsonify({"value": None}), 200
+    if current_user not in token_to_url:
+        return jsonify({"value": None}), 200
     else:
-        keys = list(url_mapping.keys())
-        return jsonify({"value": keys}), 200  
+        keys = []
+        for hash_id, user_token in url_to_token.items():
+            if user_token == current_user:
+                    keys.append(hash_id)
+        return jsonify({"value": keys}),  200
 
 @app.route('/<id>', methods=['GET'])# Route to redirect to the original URL based on its ID.
 def redirect_to_url(id):
@@ -128,9 +101,14 @@ def redirect_to_url(id):
         abort(404)
 
 @app.route('/<id>', methods=['PUT'])# Route to update an existing URL mapping with a new URL.
+@jwt_required
 def update_url(id):
+    current_user = g.user
     if id not in url_mapping:
             return jsonify({'error': 'id does not exist'}), 404
+
+    if url_to_token[id] != current_user:
+        return jsonify({'detail': 'forbidden'}), 403
     
     data = request.get_data()
     data_str = data.decode('utf-8')
@@ -149,7 +127,15 @@ def update_url(id):
         abort(404)
 
 @app.route('/<id>', methods=['DELETE'])# Route to delete a specific URL mapping based on its ID.
+@jwt_required
 def delete_url(id):
+    current_user = g.user
+    if id not in url_mapping:
+        return jsonify({'error': 'id does not exist'}), 404
+
+    if url_to_token[id] != current_user:
+        return jsonify({'detail': 'forbidden'}), 403
+
     if id in url_mapping:
         del url_mapping[id]
         return jsonify({}), 204
@@ -157,4 +143,4 @@ def delete_url(id):
         abort(404)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=8000)
