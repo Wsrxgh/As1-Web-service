@@ -7,11 +7,29 @@ from functools import wraps
 import json
 import hashlib
 from flask import g
+from flask_sqlalchemy import SQLAlchemy
+
+
 
 app = Flask(__name__)
 app.config['JWT_SECRET_KEY'] = 'group_20_secret_key'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 users = {}
+
+db = SQLAlchemy(app)
+
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(120), nullable=False)
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
 
 def base64url_encode(input):
 	return base64.urlsafe_b64encode(input).rstrip(b'=')
@@ -104,18 +122,18 @@ def create_user():
     password = data['password']
 
     if not username or not password:
-        return jsonify({'error': 'No username or password provided in JSON data'}), 400
+        return jsonify({'error': 'Missing username or password'}), 400
 
-    if username in users:
+    if User.query.filter_by(username=username).first():
         return jsonify({'detail': 'duplicate'}), 409
 
-    password_h = generate_password_hash(password)
+    new_user = User(username=username)
+    new_user.set_password(password)  
 
-    users[username] = {
-        'password': password_h
-    }
+    db.session.add(new_user)
+    db.session.commit()
 
-    return jsonify({'message': 'New user created'}), 201
+    return jsonify({'message': 'User created successfully'}), 201
 
 @app.route('/users/login', methods=['POST'])
 def login():
@@ -126,7 +144,8 @@ def login():
     if not username or not password:
         return jsonify({'error': 'No username or password provided in JSON data'}), 400
 
-    if username in users and check_password_hash(users[username]['password'], password):
+    user = User.query.filter_by(username=username).first()
+    if user and user.check_password(password):
         token = generate_jwt(username)
         return jsonify({'token': token}), 200
     else:
@@ -142,15 +161,16 @@ def change_password():
     if not username or not password or not new_password:
         return jsonify({'error': 'Missing fields in JSON data'}), 400
 
-    if username in users and check_password_hash(users[username]['password'], password):
-        new_password_hash = generate_password_hash(new_password)
-        users[username] = {
-            'password': new_password_hash
-        }
+    user = User.query.filter_by(username=username).first()
+    if user and user.check_password(password):
+        user.set_password(new_password)
+        db.session.commit()
         return jsonify({'message': 'New password set'}), 200
     else:
         return jsonify({'detail': 'forbidden'}), 403
 
 
 if __name__ == "__main__":
+	with app.app_context():
+		db.create_all()
 	app.run(debug=True, port=8001)

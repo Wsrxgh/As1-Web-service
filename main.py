@@ -4,13 +4,25 @@ import json
 import re
 import hashlib
 from flask import g
-
+from flask_sqlalchemy import SQLAlchemy
 app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///urls.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
 
 url_mapping = {}
 url_to_id = {}
 url_to_token = {}
 token_to_url = {}
+
+class URLMapping(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    original_url = db.Column(db.String(2048), nullable=False)
+    hash_id = db.Column(db.String(8), unique=True, nullable=False)
+    user_token = db.Column(db.String(256), nullable=False)
+
+    def __repr__(self):
+        return f'<URLMapping {self.original_url}>'
 
 def is_valid_url(url): #Check URL validity with a regular expression
     regex = re.compile(
@@ -37,66 +49,39 @@ def create_url():
     if 'value' not in data or not is_valid_url(data['value']):
         return jsonify({'error': 'Invalid URL'}), 400
     url = data['value']
-    
-    if url in url_to_id:# Check if the URL already exists
-        hash_id = url_to_id[url]
+    existing_mapping = URLMapping.query.filter_by(original_url=url).first()
+    if existing_mapping:
+        hash_id = existing_mapping.hash_id
     else:
         hash_id = generate_hash_id(url)
-        while hash_id in url_mapping:# Ensure the hash ID is unique
-            url += ' ' 
-            hash_id = generate_hash_id(url) # Adjust the URL slightly to attempt a new hash ID
-            if url_mapping.get(hash_id) == url: 
-                break
-        url_mapping[hash_id] = url
-        url_to_token[hash_id] = current_user
-        token_to_url[current_user] = hash_id
-        url_to_id[url] = hash_id
-
+        new_mapping = URLMapping(original_url=url, hash_id=hash_id, user_token=current_user)
+        db.session.add(new_mapping)
+        db.session.commit()
     return jsonify({'id': hash_id}), 201
 
 @app.route('/', methods=['DELETE'])# Route to delete all URL mappings.
 @jwt_required
 def delete_all_urls():
     current_user = g.user
-    if not url_mapping:
-        return jsonify({"value": None}), 404
-    if current_user not in token_to_url:
-        return jsonify({"value": None}), 404
-    else:
-        hash_ids_to_delete = []
-        for hash_id, user_token in url_to_token.items():
-            if user_token == current_user:
-                hash_ids_to_delete.append(hash_id)
-
-        for hash_id in hash_ids_to_delete:
-            if hash_id in url_mapping:
-                del url_mapping[hash_id]
-            if hash_id in url_to_id.values():
-                urls_to_delete = [url for url, h_id in url_to_id.items() if h_id == hash_id]
-                for url in urls_to_delete:
-                    del url_to_id[url]
+    URLMapping.query.filter_by(user_token=current_user).delete()
+    db.session.commit()
     abort(404)
 
 @app.route('/', methods=['GET'])# Route to list all stored URLs.
 @jwt_required
 def list_urls():
     current_user = g.user
-    if not url_mapping:  
+    mappings = URLMapping.query.filter_by(user_token=current_user).all()
+    if not mappings:
         return jsonify({"value": None}), 200
-    if current_user not in token_to_url:
-        return jsonify({"value": None}), 200
-    else:
-        keys = []
-        for hash_id, user_token in url_to_token.items():
-            if user_token == current_user:
-                    keys.append(hash_id)
-        return jsonify({"value": keys}),  200
+    keys = [mapping.hash_id for mapping in mappings]
+    return jsonify({"value": keys}), 200
 
 @app.route('/<id>', methods=['GET'])# Route to redirect to the original URL based on its ID.
 def redirect_to_url(id):
-    url = url_mapping.get(id)
-    if url:
-        return jsonify(value=url), 301
+    mapping = URLMapping.query.filter_by(hash_id=id).first()
+    if mapping:
+        return jsonify(value=mapping.original_url), 301
     else:
         abort(404)
 
@@ -104,43 +89,44 @@ def redirect_to_url(id):
 @jwt_required
 def update_url(id):
     current_user = g.user
-    if id not in url_mapping:
-            return jsonify({'error': 'id does not exist'}), 404
+    mapping = URLMapping.query.filter_by(hash_id=id, user_token=current_user).first()
 
-    if url_to_token[id] != current_user:
-        return jsonify({'detail': 'forbidden'}), 403
-    
+    if mapping is None:
+        return jsonify({'error': 'id does not exist or forbidden'}), 404
+
     data = request.get_data()
     data_str = data.decode('utf-8')
     data_dict = json.loads(data_str)
 
     if data is None:
         return jsonify({'error': 'No JSON data received'}), 400
-    if 'url' not in data_dict:
-        return jsonify({'error': 'No URL provided in JSON data'}), 400
-    if not is_valid_url(data_dict['url']):
-        return jsonify({'error': 'URL is not valid'}), 400
-    if id in url_mapping:
-        url_mapping[id] = data_dict['url']
-        return jsonify({}), 200
-    else:
-        abort(404)
+    if 'url' not in data_dict or not is_valid_url(data_dict['url']):
+        return jsonify({'error': 'No URL provided in JSON data or URL is not valid'}), 400
+
+    mapping.original_url = data_dict['url']
+    db.session.commit()
+
+    return jsonify({}), 200
 
 @app.route('/<id>', methods=['DELETE'])# Route to delete a specific URL mapping based on its ID.
 @jwt_required
 def delete_url(id):
     current_user = g.user
-    if id not in url_mapping:
+
+    mapping = URLMapping.query.filter_by(hash_id=id).first()
+
+    if mapping is None:
         return jsonify({'error': 'id does not exist'}), 404
 
-    if url_to_token[id] != current_user:
+    if mapping.user_token != current_user:
         return jsonify({'detail': 'forbidden'}), 403
+    
+    db.session.delete(mapping)
+    db.session.commit()
 
-    if id in url_mapping:
-        del url_mapping[id]
-        return jsonify({}), 204
-    else:
-        abort(404)
+    return jsonify({}), 204
 
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
     app.run(debug=True, port=8000)
