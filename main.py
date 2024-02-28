@@ -5,8 +5,12 @@ import re
 import hashlib
 from flask import g
 from flask_sqlalchemy import SQLAlchemy
+import os
+
+DATABASE_PATH = os.environ.get('DATABASE_PATH', 'urls.db')
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///urls.db'
+#app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///urls.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DATABASE_PATH}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -16,6 +20,7 @@ url_to_token = {}
 token_to_url = {}
 
 class URLMapping(db.Model):
+    __tablename__ = 'urls'
     id = db.Column(db.Integer, primary_key=True)
     original_url = db.Column(db.String(2048), nullable=False)
     hash_id = db.Column(db.String(8), unique=True, nullable=False)
@@ -129,4 +134,4 @@ def delete_url(id):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=True, port=8000)
+    app.run(debug=True, host='0.0.0.0', port=8000)

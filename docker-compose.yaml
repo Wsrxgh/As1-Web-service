@@ -1,0 +1,29 @@
+version: '3.8'
+services:
+  main:
+    build:
+      context: .
+      dockerfile: Dockerfile.main
+    ports:
+      - "8000:8000"
+    volumes:
+      - main-db-data:/app/data  
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DATABASE_PATH=/app/data/urls.db 
+      - FLASK_APP=app.py
+  auth:
+    build:
+      context: .
+      dockerfile: Dockerfile.auth
+    ports:
+      - "8001:8001"
+    volumes:
+      - auth-db-data:/app/data  
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DATABASE_PATH=/app/data/users.db  
+      - FLASK_APP=app.py
+volumes:
+  main-db-data:  
+  auth-db-data:  

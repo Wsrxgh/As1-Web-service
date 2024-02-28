@@ -8,19 +8,23 @@ import json
 import hashlib
 from flask import g
 from flask_sqlalchemy import SQLAlchemy
+import os
+#from flask_migrate import Migrate
 
+DATABASE_PATH = os.environ.get('DATABASE_PATH', 'users.db')
 
 
 app = Flask(__name__)
 app.config['JWT_SECRET_KEY'] = 'group_20_secret_key'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+#app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DATABASE_PATH}'
 users = {}
 
 db = SQLAlchemy(app)
 
 class User(db.Model):
+    __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(120), nullable=False)
@@ -30,6 +34,9 @@ class User(db.Model):
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+#migrate = Migrate(app, db)
+
 
 def base64url_encode(input):
 	return base64.urlsafe_b64encode(input).rstrip(b'=')
@@ -173,4 +180,4 @@ def change_password():
 if __name__ == "__main__":
 	with app.app_context():
 		db.create_all()
-	app.run(debug=True, port=8001)
+	app.run(debug=True, host='0.0.0.0', port=8001)
