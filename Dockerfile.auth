@@ -13,6 +13,9 @@ RUN python -m pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+ENV DATABASE_PATH=/app/data/users.db
+ENV FLASK_APP=auth.py
+
 EXPOSE 8001
 
-CMD ["python", "auth.py"]
+CMD ["python", "auth.py", "--host=0.0.0.0", "--port=8001"]
