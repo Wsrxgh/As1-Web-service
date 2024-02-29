@@ -1,22 +1,11 @@
-# Flask URL Shortener
-
-This Flask URL Shortener is a simple web application that allows users to create shortened URLs, update them, list all URLs, and delete them either individually or all at once. It uses a base62 encoding scheme to generate the short URLs.
-
-## Getting Started
+## Starting the Services of Assignment 3.1
 
 ### Prerequisites
 
-To run this application, you will need:
+Docker installed on your system
+Docker Compose installed on your system
 
-- Python 3.6 or later
-- Flask
-
-You can install Flask using pip:
-
-```bash
-pip install Flask Werkzeug
-```
-### Start
+### Configuration Files
 To start the authentication service, run:
 ```bash
 python3 auth.py
