@@ -1,14 +1,23 @@
 version: '3.8'
 services:
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - main
+      - auth
   main:
     build:
       context: .
       dockerfile: Dockerfile.main
     image: wsr123/main-service:latest
     ports:
-      - "8000:8000"
+      - "8000:8000" #map port of the container to the host
     volumes:
-      - main-db-data:/app/data  
+      - main-db-data:/app/data  #mount volumes into containers
     environment:
       - PYTHONUNBUFFERED=1
       - DATABASE_PATH=/app/data/urls.db 
