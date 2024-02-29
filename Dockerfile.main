@@ -12,6 +12,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+ENV DATABASE_PATH=/app/data/urls.db
+ENV FLASK_APP=auth.py
+
 EXPOSE 8000
 
-CMD ["python", "main.py"]
+CMD ["python", "main.py", "--host=0.0.0.0", "--port=8000"]
