@@ -20,3 +20,11 @@ The NGINX service acts as a reverse proxy, listening on port 80. It is the entry
 The Main service is accessible directly at http://localhost:8000 from the host machine. However, for consistency and security, it's recommended to access it through the NGINX proxy.
 
 Similarly, the Auth service can be accessed directly at http://localhost:8001 from the host machine. Like the Main service, it's advisable to access the Auth service through the NGINX proxy for uniformity and security.
+
+## Starting the Services of Assignment 3.2
+
+auth-deployment.yaml, url-deployment.yaml, pv.yaml, url-deployment.yaml are for deploying our services onto the Kubernetes cluster.
+
+Apply all the four yaml files on the control node with the command:
+
+    $ kubectl apply -f xx.yaml
