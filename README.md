@@ -23,7 +23,7 @@ Similarly, the Auth service can be accessed directly at http://localhost:8001 fr
 
 ## Starting the Services of Assignment 3.2
 
-auth-deployment.yaml, url-deployment.yaml, pv.yaml, url-deployment.yaml are for deploying our services onto the Kubernetes cluster.
+auth-deployment.yaml, url-deployment.yaml, pv.yaml, pvc.yaml are for deploying our services onto the Kubernetes cluster.
 
 Apply all the four yaml files on the control node with the command:
 
