@@ -4,6 +4,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.main
+    image: wsr123/main-service:latest
     ports:
       - "8000:8000"
     volumes:
@@ -16,6 +17,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.auth
+    image: wsr123/auth-service:latest
     ports:
       - "8001:8001"
     volumes:
