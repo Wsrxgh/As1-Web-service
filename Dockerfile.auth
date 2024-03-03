@@ -1,0 +1,18 @@
+ARG PYTHON_VERSION=3.8
+FROM python:${PYTHON_VERSION}-slim as base
+#slim version of image 
+ENV PYTHONDONTWRITEBYTECODE=1 
+#not write the .pyc file to the disk
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+COPY requirements.txt ./
+
+RUN python -m pip install --no-cache-dir -r requirements.txt
+# disables pip's cache
+COPY . .
+
+EXPOSE 8001
+#listen on 8001 port
+CMD ["python", "auth.py", "--host=0.0.0.0", "--port=8001"]

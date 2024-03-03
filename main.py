@@ -4,13 +4,15 @@ import json
 import re
 import hashlib
 from flask import g
+import os
+import redis
+
+
 
 app = Flask(__name__)
-
-url_mapping = {}
-url_to_id = {}
-url_to_token = {}
-token_to_url = {}
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['REDIS_URL'] = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+redis_db = redis.Redis.from_url(app.config['REDIS_URL'])
 
 def is_valid_url(url): #Check URL validity with a regular expression
     regex = re.compile(
@@ -23,124 +25,137 @@ def is_valid_url(url): #Check URL validity with a regular expression
         r'(?::\d+)?'  
         r'(?:/?|[/?]\S+)$', re.IGNORECASE)  
     return re.match(regex, url) is not None
+
   
 def generate_hash_id(url):
     hash_object = hashlib.sha256(url.encode())
     hash_id = hash_object.hexdigest()[:8]
     return hash_id
 
-@app.route('/', methods=['POST']) # Route to create a new URL entry.
+def create_url_mapping(hash_id, original_url, user_token):
+    key = f"url:{hash_id}"
+    value = json.dumps({"original_url": original_url, "user_token": user_token})
+    redis_db.set(key, value)
+
+def get_url_mapping(hash_id):
+    key = f"url:{hash_id}"
+    result = redis_db.get(key)
+    if result:
+        return json.loads(result)
+    return None
+
+
+@app.route('/', methods=['POST'])
 @jwt_required
 def create_url():
     current_user = g.user
     data = request.get_json()
     if 'value' not in data or not is_valid_url(data['value']):
         return jsonify({'error': 'Invalid URL'}), 400
-    url = data['value']
     
-    if url in url_to_id:# Check if the URL already exists
-        hash_id = url_to_id[url]
-    else:
-        hash_id = generate_hash_id(url)
-        while hash_id in url_mapping:# Ensure the hash ID is unique
-            url += ' ' 
-            hash_id = generate_hash_id(url) # Adjust the URL slightly to attempt a new hash ID
-            if url_mapping.get(hash_id) == url: 
-                break
-        url_mapping[hash_id] = url
-        url_to_token[hash_id] = current_user
-        token_to_url[current_user] = hash_id
-        url_to_id[url] = hash_id
+    url = data['value']
+    hash_id = generate_hash_id(url)  # Generate a hash ID for the URL
+    existing_mapping = get_url_mapping(hash_id)  # Check if the mapping already exists in Redis
 
+    if existing_mapping is None:
+        create_url_mapping(hash_id, url, current_user)
+    else:
+        
+        pass
+    
     return jsonify({'id': hash_id}), 201
 
-@app.route('/', methods=['DELETE'])# Route to delete all URL mappings.
+
+@app.route('/', methods=['DELETE'])
 @jwt_required
 def delete_all_urls():
     current_user = g.user
-    if not url_mapping:
-        return jsonify({"value": None}), 404
-    if current_user not in token_to_url:
-        return jsonify({"value": None}), 404
-    else:
-        hash_ids_to_delete = []
-        for hash_id, user_token in url_to_token.items():
-            if user_token == current_user:
-                hash_ids_to_delete.append(hash_id)
+    prefix = f"url:"  
+    for key in redis_db.scan_iter(f"{prefix}*"):
+        mapping = get_url_mapping(key.decode().replace(prefix, ""))
+        if mapping and mapping.get('user_token') == current_user:
+            # Delete the mapping if it belongs to the current user
+            redis_db.delete(key)
 
-        for hash_id in hash_ids_to_delete:
-            if hash_id in url_mapping:
-                del url_mapping[hash_id]
-            if hash_id in url_to_id.values():
-                urls_to_delete = [url for url, h_id in url_to_id.items() if h_id == hash_id]
-                for url in urls_to_delete:
-                    del url_to_id[url]
     abort(404)
 
-@app.route('/', methods=['GET'])# Route to list all stored URLs.
+
+@app.route('/', methods=['GET'])
 @jwt_required
 def list_urls():
     current_user = g.user
-    if not url_mapping:  
-        return jsonify({"value": None}), 200
-    if current_user not in token_to_url:
+    prefix = "url:"  
+    user_urls = []  
+
+    for key in redis_db.scan_iter(f"{prefix}*"):
+        mapping_data = redis_db.get(key)
+        if mapping_data:
+            mapping = json.loads(mapping_data)
+            if mapping.get('user_token') == current_user:
+                hash_id = key.decode().replace(prefix, "")
+                user_urls.append(hash_id)
+
+    if not user_urls:
         return jsonify({"value": None}), 200
     else:
-        keys = []
-        for hash_id, user_token in url_to_token.items():
-            if user_token == current_user:
-                    keys.append(hash_id)
-        return jsonify({"value": keys}),  200
+        return jsonify({"value": user_urls}), 200
 
-@app.route('/<id>', methods=['GET'])# Route to redirect to the original URL based on its ID.
+
+
+
+@app.route('/<id>', methods=['GET'])
 def redirect_to_url(id):
-    url = url_mapping.get(id)
-    if url:
-        return jsonify(value=url), 301
+    key = f"url:{id}"  
+    result = redis_db.get(key)  
+    if result:
+        mapping = json.loads(result)  
+        original_url = mapping.get('original_url')  
+        return jsonify(value=original_url), 301  
     else:
-        abort(404)
+        abort(404)  
 
-@app.route('/<id>', methods=['PUT'])# Route to update an existing URL mapping with a new URL.
+@app.route('/<id>', methods=['PUT'])
 @jwt_required
 def update_url(id):
     current_user = g.user
-    if id not in url_mapping:
-            return jsonify({'error': 'id does not exist'}), 404
+    key = f"url:{id}"  
+    result = redis_db.get(key)  
 
-    if url_to_token[id] != current_user:
-        return jsonify({'detail': 'forbidden'}), 403
-    
-    data = request.get_data()
-    data_str = data.decode('utf-8')
-    data_dict = json.loads(data_str)
+    if not result:
+        return jsonify({'error': 'id does not exist or forbidden'}), 404
 
-    if data is None:
-        return jsonify({'error': 'No JSON data received'}), 400
-    if 'url' not in data_dict:
-        return jsonify({'error': 'No URL provided in JSON data'}), 400
-    if not is_valid_url(data_dict['url']):
-        return jsonify({'error': 'URL is not valid'}), 400
-    if id in url_mapping:
-        url_mapping[id] = data_dict['url']
-        return jsonify({}), 200
-    else:
-        abort(404)
+    mapping = json.loads(result.decode()) 
 
-@app.route('/<id>', methods=['DELETE'])# Route to delete a specific URL mapping based on its ID.
+    if mapping['user_token'] != current_user:
+        return jsonify({'error': 'id does not exist or forbidden'}), 404
+
+    data = request.get_json()  
+
+    if not data or 'url' not in data or not is_valid_url(data['url']):
+        return jsonify({'error': 'No URL provided in JSON data or URL is not valid'}), 400
+
+    updated_mapping = {'original_url': data['url'], 'user_token': current_user}
+    redis_db.set(key, json.dumps(updated_mapping))  
+
+    return jsonify({}), 200
+
+
+@app.route('/<id>', methods=['DELETE'])
 @jwt_required
 def delete_url(id):
     current_user = g.user
-    if id not in url_mapping:
+    key = f"url:{id}"
+    result = redis_db.get(key)
+    
+    if not result:
         return jsonify({'error': 'id does not exist'}), 404
 
-    if url_to_token[id] != current_user:
+    mapping = json.loads(result)
+    if mapping['user_token'] != current_user:
         return jsonify({'detail': 'forbidden'}), 403
+    redis_db.delete(key)
 
-    if id in url_mapping:
-        del url_mapping[id]
-        return jsonify({}), 204
-    else:
-        abort(404)
+    return jsonify({}), 204
 
 if __name__ == '__main__':
-    app.run(debug=True, port=8000)
+    app.run(debug=True, host='0.0.0.0', port=8000)

@@ -7,11 +7,44 @@ from functools import wraps
 import json
 import hashlib
 from flask import g
+import redis
+import os
 
 app = Flask(__name__)
 app.config['JWT_SECRET_KEY'] = 'group_20_secret_key'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['REDIS_URL'] = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+redis_db = redis.Redis.from_url(app.config['REDIS_URL'])
 
-users = {}
+
+class User:
+    def __init__(self, username, password_hash=None):
+        self.username = username
+        self.password_hash = password_hash
+
+    @classmethod
+    def create(cls, username, password):
+       
+        if cls.get(username) is not None:
+            raise ValueError('User already exists')
+
+        password_hash = generate_password_hash(password)
+        user_data = {'username': username, 'password_hash': password_hash}
+        redis_db.set(f"user:{username}", json.dumps(user_data))
+
+    @classmethod
+    def get(cls, username):
+       
+        user_data = redis_db.get(f"user:{username}")
+        if user_data:
+            user_dict = json.loads(user_data)
+            return cls(username=user_dict['username'], password_hash=user_dict['password_hash'])
+        return None
+
+    def check_password(self, password):
+      
+        return check_password_hash(self.password_hash, password)
+
 
 def base64url_encode(input):
 	return base64.urlsafe_b64encode(input).rstrip(b'=')
@@ -100,57 +133,56 @@ def jwt_required(f):
 @app.route('/users', methods=['POST'])
 def create_user():
     data = request.get_json()
-    username = data['username']
-    password = data['password']
+    username = data.get('username')
+    password = data.get('password')
 
     if not username or not password:
-        return jsonify({'error': 'No username or password provided in JSON data'}), 400
+        return jsonify({'error': 'Missing username or password'}), 400
 
-    if username in users:
-        return jsonify({'detail': 'duplicate'}), 409
-
-    password_h = generate_password_hash(password)
-
-    users[username] = {
-        'password': password_h
-    }
-
-    return jsonify({'message': 'New user created'}), 201
+    try:
+        User.create(username, password)
+    except ValueError as e:
+        return jsonify({'detail': str(e)}), 409
+    return jsonify({'message': 'User created successfully'}), 201
 
 @app.route('/users/login', methods=['POST'])
 def login():
     data = request.get_json()
-    username = data['username']
-    password = data['password']
+    username = data.get('username')
+    password = data.get('password')
 
     if not username or not password:
         return jsonify({'error': 'No username or password provided in JSON data'}), 400
 
-    if username in users and check_password_hash(users[username]['password'], password):
+    user = User.get(username)
+    if user and user.check_password(password):
         token = generate_jwt(username)
         return jsonify({'token': token}), 200
     else:
         return jsonify({'detail': 'forbidden'}), 403
 
+
+
 @app.route('/users', methods=['PUT'])
 def change_password():
     data = request.get_json()
-    username = data['username']
-    password = data['password']
-    new_password = data['new_password']
+    username = data.get('username')
+    password = data.get('password')
+    new_password = data.get('new_password')
 
     if not username or not password or not new_password:
         return jsonify({'error': 'Missing fields in JSON data'}), 400
 
-    if username in users and check_password_hash(users[username]['password'], password):
+    user = User.get(username)
+    if user and user.check_password(password):
         new_password_hash = generate_password_hash(new_password)
-        users[username] = {
-            'password': new_password_hash
-        }
+        user_data = {'username': username, 'password_hash': new_password_hash}
+        redis_db.set(f"user:{username}", json.dumps(user_data))
         return jsonify({'message': 'New password set'}), 200
     else:
         return jsonify({'detail': 'forbidden'}), 403
 
 
 if __name__ == "__main__":
-	app.run(debug=True, port=8001)
+    app.run(debug=True, host='0.0.0.0', port=8001)
+
