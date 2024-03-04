@@ -23,8 +23,37 @@ Similarly, the Auth service can be accessed directly at http://localhost:8001 fr
 
 ## Starting the Services of Assignment 3.2
 
-auth-deployment.yaml, url-deployment.yaml, pv.yaml, pvc.yaml are for deploying our services onto the Kubernetes cluster.
+The yaml files (auth-deployment.yaml, url-deployment.yaml, redis-delpyment.yaml, redis-pv.yaml and redis-pvc.yaml) are for deploying our services onto the Kubernetes cluster.
 
-Apply all the four yaml files on the control node with the command:
+Enter the control node and apply all the yaml files with the command:
 
     $ kubectl apply -f xx.yaml
+
+To view the deployments, run:
+
+```
+$ kubectl get pods
+---
+NAME                               READY   STATUS    RESTARTS   AGE
+auth-deployment-74b8cb857f-2fxrc   1/1     Running   0          21h
+redis-deployment-8d7d5674-dvgff    1/1     Running   0          21h
+url-deployment-7fdf6bfb9-ccj2r     1/1     Running   0          21h
+url-deployment-7fdf6bfb9-dgkmf     1/1     Running   0          21h
+url-deployment-7fdf6bfb9-vwn5k     1/1     Running   0          21h
+```
+
+Our deployments are configured to run in the default namespace. The URL-shortener service has 3 replicas running.
+
+To view the services, run:
+
+```
+$ kubectl get services
+---
+NAME            TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)          AGE
+auth-service    NodePort    10.107.173.103   <none>        8001:31178/TCP   4d6h
+kubernetes      ClusterIP   10.96.0.1        <none>        443/TCP          4d6h
+redis-service   ClusterIP   10.98.81.93      <none>        6379/TCP         21h
+url-service     NodePort    10.99.10.174     <none>        8000:31520/TCP   4d6h
+```
+
+The auth-service and url-service are of type NodePort thus we could access them with the node IP address followed by the port number. For example, to access the authentication service we could send requests to  http://145.100.135.244:31520/ (with the control node IP address 145.100.135.244).
