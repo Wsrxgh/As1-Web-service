@@ -6,10 +6,10 @@ Docker installed on your system
 
 Docker Compose installed on your system
 
-Ensure you have the all of working source files in your project directory.
+Ensure you are in the right directory.
 
 ### Steps to Launch the Services
-Navigate to the directory containing your docker-compose.yml file and run the following command:
+Navigate to the directory named 3.1,  run the following command:
 ```bash
 docker-compose up --build
 ```
@@ -23,9 +23,22 @@ Similarly, the Auth service can be accessed directly at http://localhost:8001 fr
 
 ## Starting the Services of Assignment 3.2
 
-The yaml files (auth-deployment.yaml, url-deployment.yaml, redis-delpyment.yaml, redis-pv.yaml and redis-pvc.yaml) are for deploying our services onto the Kubernetes cluster.
+### Prerequisites
+Set up the Kubernetes cluster correctly. In this assignment we installed k8s v1.23.
 
-Enter the control node and apply all the yaml files with the command:
+```
+$ kubectl get nodes
+---
+NAME            STATUS   ROLES                  AGE    VERSION
+kubeclass-242   Ready    <none>                 4d6h   v1.23.17
+kubeclass-243   Ready    <none>                 4d6h   v1.23.17
+kubeclass-244   Ready    control-plane,master   4d6h   v1.23.17
+```
+
+### Steps to Launch the Services
+Navigate to the directory named 3.2, the yaml files (auth-deployment.yaml, url-deployment.yaml, redis-delpyment.yaml, redis-pv.yaml and redis-pvc.yaml) are for deploying our services onto the Kubernetes cluster.
+
+Make sure you have all the yaml files on the control node and run the below command there:
 
     $ kubectl apply -f xx.yaml
 
